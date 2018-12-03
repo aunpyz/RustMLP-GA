@@ -1,6 +1,8 @@
 [package]
-name = "GA"
+name = "genetic_algorithm"
 version = "0.1.0"
 authors = ["aunnop_kattiyanet <aunnop_kattiyanet@hotmail.com>"]
 
 [dependencies]
+
+rand = "0.6.1"
