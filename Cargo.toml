@@ -1,0 +1,6 @@
+[package]
+name = "GA"
+version = "0.1.0"
+authors = ["aunnop_kattiyanet <aunnop_kattiyanet@hotmail.com>"]
+
+[dependencies]
