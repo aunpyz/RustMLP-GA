@@ -18,5 +18,5 @@ fn main() {
 
     let input = data_ops::vectorize(f);
     // let (_populations, _neuron_type) = neural_network::NeuralNetwork::populate(30, _expr1, 2, 10);
-    neural_network::cross_validation((30, _expr2, 2), 10, 10, 200, 3, input);
+    neural_network::cross_validation((30, _expr2, 2), 10, 10, 200, 3, 0.2, input);
 }

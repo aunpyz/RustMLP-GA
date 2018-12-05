@@ -137,6 +137,7 @@ pub fn cross_validation(
     validate_section: usize,
     epoch: usize,
     elitism_number: usize,
+    min: f64,
     data: Vec<Vec<f64>>,
 ) {
     let k: i32 = thread_rng().gen_range(1, 5);
@@ -163,7 +164,7 @@ pub fn cross_validation(
                     fitnesses.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
                     assert_eq!(fitnesses.len(), population);
                     let next_gen = ga::elitism(&chromosomes, elitism_number, &fitnesses);
-                    // select n=population times
+                    let mating_pool = ga::selection(&mut chromosomes, population, min, &fitnesses);
                     // crossover
                     // mutation
                     // roll back
