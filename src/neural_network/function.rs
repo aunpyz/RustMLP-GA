@@ -18,6 +18,5 @@ pub fn split_section(data: Vec<Vec<f64>>, section: usize) -> Vec<Vec<Vec<f64>>> 
     split_data
 }
 
-pub fn sort() {
-    
-}
+// use quicksort algorithm
+pub fn sort() {}

@@ -1,4 +1,5 @@
 use super::rand::{thread_rng, Rng};
+use std::cmp::Ordering;
 
 mod function;
 mod ga;
@@ -55,9 +56,10 @@ impl NeuralNetwork {
         &self.weights
     }
 
-    fn forward_pass(&self,
+    fn forward_pass(
+        &self,
         data: &Vec<f64>,
-        (input, hidden_layer, output): (usize, &Vec<usize>, usize)
+        (input, hidden_layer, output): (usize, &Vec<usize>, usize),
     ) -> Vec<f64> {
         let next = hidden_layer[0];
         let mut outputs: Vec<f64> = Vec::with_capacity(output);
@@ -83,7 +85,7 @@ impl NeuralNetwork {
             if cap > 1 {
                 for i in 0..cap {
                     let mut next;
-                    
+
                     if i == cap - 1 {
                         next = output;
                     } else {
@@ -134,8 +136,10 @@ pub fn cross_validation(
     population: usize,
     validate_section: usize,
     epoch: usize,
+    elitism_number: usize,
     data: Vec<Vec<f64>>,
 ) {
+    let k: i32 = thread_rng().gen_range(1, 5);
     let data_sections = function::split_section(data, validate_section);
     let master_chromosomes = NeuralNetwork::populate(input, &hidden_layer, output, population);
     for i in 0..validate_section {
@@ -149,16 +153,21 @@ pub fn cross_validation(
                 }
 
                 let data = &data_sections[j];
-                let mut fitnesses: Vec<(f64, usize)> = Vec::new();
+                // collection of fitness/ chromosome index pair
+                let mut fitnesses: Vec<(f64, usize)> = Vec::with_capacity(population);
                 for item in data.iter() {
                     for (index, chromosome) in chromosomes.iter().enumerate() {
                         let errors = chromosome.forward_pass(item, (input, &hidden_layer, output));
-                        fitnesses.push((ga::fitness(errors), index));
-                        println!("{:?}", fitnesses);
-                        if index == 5 {
-                            panic!("STOP");
-                        }
+                        fitnesses.push((ga::fitness(errors, k), index));
                     }
+                    fitnesses.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
+                    assert_eq!(fitnesses.len(), population);
+                    let next_gen = ga::elitism(&chromosomes, elitism_number, &fitnesses);
+                    // select n=population times
+                    // crossover
+                    // mutation
+                    // roll back
+                    panic!("k: {}\n{:?}\n{:?}\nSTOP", k, fitnesses, next_gen);
                 }
             }
         }
