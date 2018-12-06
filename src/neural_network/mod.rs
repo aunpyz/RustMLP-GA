@@ -51,9 +51,8 @@ impl NeuralNetwork {
         networks
     }
 
-    // temporary getter
-    fn weights(&self) -> &Vec<f64> {
-        &self.weights
+    fn weight_len(&self) -> usize {
+        self.weights.len()
     }
 
     fn forward_pass(
@@ -164,11 +163,11 @@ pub fn cross_validation(
                     fitnesses.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
                     assert_eq!(fitnesses.len(), population);
                     let next_gen = ga::elitism(&chromosomes, elitism_number, &fitnesses);
-                    let mating_pool = ga::selection(&mut chromosomes, population, min, &fitnesses);
-                    // crossover
+                    let mut mating_pool = ga::selection(&mut chromosomes, population, min, &fitnesses);
+                    let p2 = ga::recombination(&mut mating_pool);
                     // mutation
                     // roll back
-                    panic!("k: {}\n{:?}\n{:?}\nSTOP", k, fitnesses, next_gen);
+                    panic!("k: {}\n{:?}\n{:?}\n{:?}\nSTOP", k, fitnesses, mating_pool.len(), p2.len());
                 }
             }
         }
