@@ -17,6 +17,5 @@ fn main() {
     let f = BufReader::new(f);
 
     let input = data_ops::vectorize(f);
-    // let (_populations, _neuron_type) = neural_network::NeuralNetwork::populate(30, _expr1, 2, 10);
-    neural_network::cross_validation((30, _expr2, 2), (10, 3, 0.2, 0.01), 10, 200, input);
+    neural_network::cross_validation((30, _expr2, 2), (10, 3, 0.2, 0.01), 10, 200, input, String::from("wdbc_out.txt"));
 }

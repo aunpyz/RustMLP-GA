@@ -1,5 +1,10 @@
 use super::rand::{thread_rng, Rng};
 use std::cmp::Ordering;
+use std::fmt;
+use std::error::Error;
+use std::fs::File;
+use std::io::prelude::*;
+use std::path::Path;
 
 mod function;
 mod ga;
@@ -7,6 +12,17 @@ mod ga;
 #[derive(Debug, Clone)]
 pub struct NeuralNetwork {
     weights: Vec<f64>,
+}
+
+impl fmt::Display for NeuralNetwork {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut display = String::new();
+        display.push_str(&format!("Neural Network\nweight: "));
+        for i in 0..self.weights.len() {
+            display.push_str(&format!("{}, ", self.weights[i]));
+        }
+        write!(f, "{}\n", display)
+    }
 }
 
 impl NeuralNetwork {
@@ -136,13 +152,37 @@ pub fn cross_validation(
     validate_section: usize,
     epoch: usize,
     data: Vec<Vec<f64>>,
+    out: String,
 ) {
+    let path = format!("./out/{}", out);
+    let path = Path::new(&path);
+    let display = path.display();
+
+    let mut f = match File::create(&path) {
+        Err(why) => panic!("couldn't create {}: {}", display, why.description()),
+        Ok(f) => f,
+    };
+
     let k: i32 = thread_rng().gen_range(1, 5);
     let data_sections = function::split_section(data, validate_section);
     let master_chromosomes = NeuralNetwork::populate(input, &hidden_layer, output, population);
     for i in 0..validate_section {
         let mut chromosomes = ga::clone_population(&master_chromosomes);
         // total of epoch * number of lines generations
+        
+        {
+            if let Err(why) = f.write_all(format!("\
+                ========================================================================================\n\
+                BEFORE\n").as_bytes()) {
+                panic!("couldn't write to {}: {}", display, why.description());
+            }
+            for i in 0..chromosomes.len() {
+                if let Err(why) = f.write_all(format!("{}\n", chromosomes[i]).as_bytes()) {
+                    panic!("couldn't write chromosome {} to {}: {}", i, display, why.description());
+                }
+            }
+        }
+
         for _iter in 0..epoch {
             for j in 0..validate_section {
                 // skip index i
@@ -163,7 +203,7 @@ pub fn cross_validation(
                     assert_eq!(
                         fitnesses.len(),
                         population,
-                        "section{} fitness{:?}",
+                        "section {} fitness {:?}",
                         j,
                         fitnesses
                     );
@@ -183,6 +223,20 @@ pub fn cross_validation(
                         }
                     }
                     chromosomes = next_gen;
+                    
+                    {
+                        if let Err(why) = f.write_all(format!("\
+                            ========================================================================================\n\
+                            P2\n").as_bytes()) {
+                            panic!("couldn't write to {}: {}", display, why.description());
+                        }
+                        for i in 0..chromosomes.len() {
+                            if let Err(why) = f.write_all(format!("{}\n", chromosomes[i]).as_bytes()) {
+                                panic!("couldn't write child chromosome {} to {}: {}", i, display, why.description());
+                            }
+                        }
+                    }
+
                 }
             }
         }
