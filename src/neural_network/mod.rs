@@ -132,11 +132,9 @@ impl NeuralNetwork {
 
 pub fn cross_validation(
     (input, hidden_layer, output): (usize, Vec<usize>, usize),
-    population: usize,
+    (population, elitism_number, min, pm): (usize, usize, f64, f64),
     validate_section: usize,
     epoch: usize,
-    elitism_number: usize,
-    min: f64,
     data: Vec<Vec<f64>>,
 ) {
     let k: i32 = thread_rng().gen_range(1, 5);
@@ -144,7 +142,7 @@ pub fn cross_validation(
     let master_chromosomes = NeuralNetwork::populate(input, &hidden_layer, output, population);
     for i in 0..validate_section {
         let mut chromosomes = ga::clone_population(&master_chromosomes);
-        // total of epoch * population generations
+        // total of epoch * number of lines generations
         for _iter in 0..epoch {
             for j in 0..validate_section {
                 // skip index i
@@ -153,21 +151,38 @@ pub fn cross_validation(
                 }
 
                 let data = &data_sections[j];
-                // collection of fitness/ chromosome index pair
-                let mut fitnesses: Vec<(f64, usize)> = Vec::with_capacity(population);
                 for item in data.iter() {
+                    // collection of fitness/ chromosome index pair
+                    let mut fitnesses: Vec<(f64, usize)> = Vec::with_capacity(population);
+
                     for (index, chromosome) in chromosomes.iter().enumerate() {
                         let errors = chromosome.forward_pass(item, (input, &hidden_layer, output));
                         fitnesses.push((ga::fitness(errors, k), index));
                     }
                     fitnesses.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
-                    assert_eq!(fitnesses.len(), population);
-                    let next_gen = ga::elitism(&chromosomes, elitism_number, &fitnesses);
-                    let mut mating_pool = ga::selection(&mut chromosomes, population, min, &fitnesses);
-                    let p2 = ga::recombination(&mut mating_pool);
-                    // mutation
-                    // roll back
-                    panic!("k: {}\n{:?}\n{:?}\n{:?}\nSTOP", k, fitnesses, mating_pool.len(), p2.len());
+                    assert_eq!(
+                        fitnesses.len(),
+                        population,
+                        "section{} fitness{:?}",
+                        j,
+                        fitnesses
+                    );
+                    let mut next_gen = ga::elitism(&chromosomes, elitism_number, &fitnesses);
+                    let mut mating_pool =
+                        ga::selection(&mut chromosomes, population, min, &fitnesses);
+                    let p2 = ga::recombination(mating_pool);
+                    let mut p2 = ga::mutate(p2, pm);
+                    loop {
+                        if next_gen.len() < population {
+                            let i = thread_rng().gen_range(0, p2.len());
+                            let sel: NeuralNetwork = p2[i].clone();
+                            p2.remove(i);
+                            next_gen.push(sel)
+                        } else {
+                            break;
+                        }
+                    }
+                    chromosomes = next_gen;
                 }
             }
         }

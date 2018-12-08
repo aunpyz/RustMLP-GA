@@ -79,7 +79,7 @@ pub fn selection(
     mp
 }
 
-pub fn recombination(mp: &mut Vec<NeuralNetwork>) -> Vec<NeuralNetwork> {
+pub fn recombination(mut mp: Vec<NeuralNetwork>) -> Vec<NeuralNetwork> {
     let mut children: Vec<NeuralNetwork> = Vec::with_capacity(mp.len());
     loop {
         if mp.is_empty() || mp.len() == 1 {
@@ -106,6 +106,34 @@ pub fn recombination(mp: &mut Vec<NeuralNetwork>) -> Vec<NeuralNetwork> {
         children.extend_from_slice(&[c1, c2]);
     }
     children
+}
+
+pub fn mutate(mut chromosomes: Vec<NeuralNetwork>, pm: f64) -> Vec<NeuralNetwork> {
+    let mut mutated: Vec<NeuralNetwork> = Vec::with_capacity(chromosomes.len());
+    let mut rng = thread_rng();
+    loop {
+        if chromosomes.is_empty() {
+            break;
+        }
+
+        let c = match chromosomes.pop() {
+            Some(c) => c,
+            None => panic!("Unexpected error"),
+        };
+
+        let mut weights: Vec<f64> = c.weights;
+        for i in 0..weights.len() {
+            let q = rng.gen_range(0_f64, 1_f64);
+            if q < pm {
+                let mutation = rng.gen_range(-1_f64, 1_f64);
+                weights[i] += mutation;
+            }
+        }
+
+        mutated.push(NeuralNetwork { weights });
+    }
+    assert_eq!(mutated.len(), 10);
+    mutated
 }
 
 // 2-point crossover
