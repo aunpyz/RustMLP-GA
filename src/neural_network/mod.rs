@@ -75,9 +75,11 @@ impl NeuralNetwork {
         &self,
         data: &Vec<f64>,
         (input, hidden_layer, output): (usize, &Vec<usize>, usize),
-    ) -> Vec<f64> {
+        train: bool,
+    ) -> (Vec<f64>, Vec<f64>) {
         let next = hidden_layer[0];
         let mut outputs: Vec<f64> = Vec::with_capacity(output);
+        let mut d_output: Vec<f64> = Vec::with_capacity(output);
         let mut output_to_next: Vec<f64> = Vec::new();
         for i in 0..next {
             // skip output at index 0 & 1
@@ -140,9 +142,14 @@ impl NeuralNetwork {
 
         for i in 0..output {
             let desired_output = data[i];
-            outputs[i] = desired_output - outputs[i];
+            d_output.push(desired_output);
+
+            // if train, first output will be vector of error
+            if train {
+                outputs[i] = desired_output - outputs[i];
+            }
         }
-        outputs
+        (outputs, d_output)
     }
 }
 
@@ -153,10 +160,13 @@ pub fn cross_validation(
     epoch: usize,
     data: Vec<Vec<f64>>,
     out: String,
-) {
+) -> (Vec<Vec<f64>>, Vec<Vec<f64>>) {
     let path = format!("./out/{}", out);
     let path = Path::new(&path);
     let display = path.display();
+
+    let mut out: Vec<Vec<f64>> = Vec::new();
+    let mut d_out: Vec<Vec<f64>> = Vec::new();
 
     let mut f = match File::create(&path) {
         Err(why) => panic!("couldn't create {}: {}", display, why.description()),
@@ -169,7 +179,7 @@ pub fn cross_validation(
     for i in 0..validate_section {
         let mut chromosomes = ga::clone_population(&master_chromosomes);
         // total of epoch * number of lines generations
-        
+
         {
             if let Err(why) = f.write_all(format!("\
                 ========================================================================================\n\
@@ -178,7 +188,12 @@ pub fn cross_validation(
             }
             for i in 0..chromosomes.len() {
                 if let Err(why) = f.write_all(format!("{}\n", chromosomes[i]).as_bytes()) {
-                    panic!("couldn't write chromosome {} to {}: {}", i, display, why.description());
+                    panic!(
+                        "couldn't write chromosome {} to {}: {}",
+                        i,
+                        display,
+                        why.description()
+                    );
                 }
             }
         }
@@ -196,7 +211,8 @@ pub fn cross_validation(
                     let mut fitnesses: Vec<(f64, usize)> = Vec::with_capacity(population);
 
                     for (index, chromosome) in chromosomes.iter().enumerate() {
-                        let errors = chromosome.forward_pass(item, (input, &hidden_layer, output));
+                        let (errors, _desired_output) =
+                            chromosome.forward_pass(item, (input, &hidden_layer, output), true);
                         fitnesses.push((ga::fitness(errors, k), index));
                     }
                     fitnesses.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
@@ -223,22 +239,33 @@ pub fn cross_validation(
                         }
                     }
                     chromosomes = next_gen;
-                    
-                    {
-                        if let Err(why) = f.write_all(format!("\
-                            ========================================================================================\n\
-                            P2\n").as_bytes()) {
-                            panic!("couldn't write to {}: {}", display, why.description());
-                        }
-                        for i in 0..chromosomes.len() {
-                            if let Err(why) = f.write_all(format!("{}\n", chromosomes[i]).as_bytes()) {
-                                panic!("couldn't write child chromosome {} to {}: {}", i, display, why.description());
-                            }
-                        }
-                    }
-
                 }
             }
         }
+
+        let data = &data_sections[i];
+
+        // first chromosome is the fittest one, as being kept by elitism
+        let chromosome: NeuralNetwork = chromosomes[0].clone();
+
+        // find fittest chromosome & validity test of fittest one
+        {
+            for item in data.iter() {
+                let (output, desired_output) =
+                    chromosome.forward_pass(item, (input, &hidden_layer, output), false);
+                assert_eq!(output.len(), desired_output.len());
+                out.push(output);
+                d_out.push(desired_output);
+            }
+
+            if let Err(why) = f.write_all(format!("\
+                ========================================================================================\n\
+                BEST Chromosome in fold #{}\n{}\n", i, chromosome).as_bytes()) {
+                panic!("couldn't write to {}: {}", display, why.description());
+            }
+        }
     }
+
+    // for classification
+    (out, d_out)
 }

@@ -1,4 +1,4 @@
-use rand::{self, seq::SliceRandom};
+use rand::seq::SliceRandom;
 use std::fs::File;
 use std::io::BufReader;
 use std::io::prelude::*;
@@ -28,4 +28,12 @@ pub fn vectorize(f: BufReader<File>) -> Vec<Vec<f64>> {
     }
     data_all.shuffle(&mut rand::thread_rng());
     data_all
+}
+
+pub fn confusion_matrix(
+    (output, desire_output): (Vec<Vec<f64>>, Vec<Vec<f64>>),
+    out_filename: String,
+) {
+    println!("{} {}", output.len(), desire_output.len());
+    panic!("output {:?}\ndesired output {:?}", output, desire_output);
 }

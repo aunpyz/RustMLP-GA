@@ -17,5 +17,13 @@ fn main() {
     let f = BufReader::new(f);
 
     let input = data_ops::vectorize(f);
-    neural_network::cross_validation((30, _expr2, 2), (10, 3, 0.2, 0.01), 10, 200, input, String::from("wdbc_out.txt"));
+    let (out, desire_output) = neural_network::cross_validation(
+        (30, _expr2, 2),
+        (10, 3, 0.2, 0.01),
+        10,
+        10,
+        input,
+        String::from("wdbc_out.txt"),
+    );
+    data_ops::confusion_matrix((out, desire_output), String::from("wdbc_cross_out.txt"));
 }
