@@ -104,7 +104,8 @@ pub fn recombination(mut mp: Vec<NeuralNetwork>) -> Vec<NeuralNetwork> {
 }
 
 pub fn mutate(mut chromosomes: Vec<NeuralNetwork>, pm: f64) -> Vec<NeuralNetwork> {
-    let mut mutated: Vec<NeuralNetwork> = Vec::with_capacity(chromosomes.len());
+    let pop = chromosomes.len();
+    let mut mutated: Vec<NeuralNetwork> = Vec::with_capacity(pop);
     let mut rng = thread_rng();
     loop {
         if chromosomes.is_empty() {
@@ -127,7 +128,7 @@ pub fn mutate(mut chromosomes: Vec<NeuralNetwork>, pm: f64) -> Vec<NeuralNetwork
 
         mutated.push(NeuralNetwork { weights });
     }
-    assert_eq!(mutated.len(), 10);
+    assert_eq!(mutated.len(), pop);
     mutated
 }
 
