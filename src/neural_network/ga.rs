@@ -1,12 +1,7 @@
 use super::NeuralNetwork;
 use rand::{thread_rng, Rng};
 
-pub fn fitness(error_vec: Vec<f64>, k: i32) -> f64 {
-    let mut sse: f64 = 0 as f64;
-    for (_i, item) in error_vec.iter().enumerate() {
-        sse += item.powi(2);
-    }
-    let fx = sse / 2.0;
+pub fn fitness(fx: f64, k: i32) -> f64 {
     1.0 / (k as f64 + fx)
 }
 

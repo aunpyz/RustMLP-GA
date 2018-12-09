@@ -174,16 +174,29 @@ pub fn cross_validation(
     };
 
     let k: i32 = thread_rng().gen_range(1, 5);
+    let total_data = data.len();
     let data_sections = function::split_section(data, validate_section);
     let master_chromosomes = NeuralNetwork::populate(input, &hidden_layer, output, population);
+
+    // data to pick the fittest chromosome of all k-fold
+    let mut best_chromosome: Vec<NeuralNetwork> = Vec::with_capacity(validate_section);
+    let mut best_fitnesses: Vec<(f64, usize)> = Vec::with_capacity(validate_section);
+
+    let mut fitnesses: Vec<(f64, usize)> = Vec::with_capacity(population);
+    let mut mse: Vec<f64> = Vec::with_capacity(population);
     for i in 0..validate_section {
         let mut chromosomes = ga::clone_population(&master_chromosomes);
-        // total of epoch * number of lines generations
+        // total of epoch generations
 
         {
-            if let Err(why) = f.write_all(format!("\
-                ========================================================================================\n\
-                BEFORE\n").as_bytes()) {
+            if let Err(why) = f.write_all(
+                format!(
+                    "\
+                =================================================================================\n\
+                BEFORE\n"
+                ).as_bytes(),
+            )
+            {
                 panic!("couldn't write to {}: {}", display, why.description());
             }
             for i in 0..chromosomes.len() {
@@ -198,7 +211,12 @@ pub fn cross_validation(
             }
         }
 
-        for _iter in 0..epoch {
+        for iter in 0..epoch {
+            // collection of fitness/ chromosome index pair
+            for _i in 0..population {
+                mse.push(0_f64);
+            }
+
             for j in 0..validate_section {
                 // skip index i
                 if j == i {
@@ -207,62 +225,123 @@ pub fn cross_validation(
 
                 let data = &data_sections[j];
                 for item in data.iter() {
-                    // collection of fitness/ chromosome index pair
-                    let mut fitnesses: Vec<(f64, usize)> = Vec::with_capacity(population);
-
                     for (index, chromosome) in chromosomes.iter().enumerate() {
                         let (errors, _desired_output) =
                             chromosome.forward_pass(item, (input, &hidden_layer, output), true);
-                        fitnesses.push((ga::fitness(errors, k), index));
+                        mse[index] += function::mean_sqrt_err(errors);
                     }
-                    fitnesses.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
-                    assert_eq!(
-                        fitnesses.len(),
-                        population,
-                        "section {} fitness {:?}",
-                        j,
-                        fitnesses
-                    );
-                    let mut next_gen = ga::elitism(&chromosomes, elitism_number, &fitnesses);
-                    let mut mating_pool =
-                        ga::selection(&mut chromosomes, population, min, &fitnesses);
-                    let p2 = ga::recombination(mating_pool);
-                    let mut p2 = ga::mutate(p2, pm);
-                    loop {
-                        if next_gen.len() < population {
-                            let i = thread_rng().gen_range(0, p2.len());
-                            let sel: NeuralNetwork = p2[i].clone();
-                            p2.remove(i);
-                            next_gen.push(sel)
-                        } else {
-                            break;
-                        }
-                    }
-                    chromosomes = next_gen;
                 }
             }
+
+            // calculating fitness
+            for i in 0..population {
+                fitnesses.push((ga::fitness(mse[i] / total_data as f64, k), i));
+            }
+            fitnesses.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
+            assert_eq!(
+                fitnesses.len(),
+                population,
+                "epoch {} fitness {:?}",
+                iter,
+                fitnesses
+            );
+
+            let mut next_gen = ga::elitism(&chromosomes, elitism_number, &fitnesses);
+            let mut mating_pool = ga::selection(&mut chromosomes, population, min, &fitnesses);
+            let p2 = ga::recombination(mating_pool);
+            let mut p2 = ga::mutate(p2, pm);
+            loop {
+                if next_gen.len() < population {
+                    let i = thread_rng().gen_range(0, p2.len());
+                    let sel: NeuralNetwork = p2[i].clone();
+                    p2.remove(i);
+                    next_gen.push(sel)
+                } else {
+                    break;
+                }
+            }
+            chromosomes = next_gen;
+            fitnesses.clear();
+            mse.clear();
         }
 
         let data = &data_sections[i];
 
-        // first chromosome is the fittest one, as being kept by elitism
-        let chromosome: NeuralNetwork = chromosomes[0].clone();
-
-        // find fittest chromosome & validity test of fittest one
+        // validity test of fittest chromosome of fold i
         {
-            for item in data.iter() {
-                let (output, desired_output) =
-                    chromosome.forward_pass(item, (input, &hidden_layer, output), false);
-                assert_eq!(output.len(), desired_output.len());
-                out.push(output);
-                d_out.push(desired_output);
+            // first chromosome is the fittest one, as being kept by elitism
+            for _i in 0..population {
+                mse.push(0_f64);
             }
 
-            if let Err(why) = f.write_all(format!("\
-                ========================================================================================\n\
-                BEST Chromosome in fold #{}\n{}\n", i, chromosome).as_bytes()) {
+            for item in data.iter() {
+                for (index, chromosome) in chromosomes.iter().enumerate() {
+                    let (errors, _desired_output) =
+                        chromosome.forward_pass(item, (input, &hidden_layer, output), true);
+                    mse[index] += function::mean_sqrt_err(errors);
+                }
+            }
+
+            let total_data = data.len();
+            for i in 0..population {
+                fitnesses.push((ga::fitness(mse[i] / total_data as f64, k), i));
+            }
+            fitnesses.sort_by(|a, b| b.partial_cmp(a).unwrap_or(Ordering::Equal));
+            assert_eq!(
+                fitnesses.len(),
+                population,
+                "fold {} fitness {:?}",
+                i,
+                fitnesses
+            );
+            let chromosome: NeuralNetwork = chromosomes[fitnesses[0].1].clone();
+
+            if let Err(why) = f.write_all(
+                format!(
+                    "\
+                =================================================================================\n\
+                BEST Chromosome in fold #{}\n{}\n",
+                    i,
+                    chromosome
+                ).as_bytes(),
+            )
+            {
                 panic!("couldn't write to {}: {}", display, why.description());
             }
+
+            // keep best coromosome and its fitness from fold i
+            best_chromosome.push(chromosome);
+            best_fitnesses.push((fitnesses[0].0, i));
+            fitnesses.clear();
+            mse.clear();
+        }
+    }
+
+    // find the fittest chromosome among k-fold
+    assert_eq!(best_chromosome.len(), validate_section);
+    best_fitnesses.sort_by(|a, b| b.partial_cmp(a).unwrap_or(Ordering::Equal));
+    let best_chromosome = best_chromosome[best_fitnesses[0].1].clone();
+
+    {
+        if let Err(why) = f.write_all(
+            format!(
+                "\
+                =================================================================================\n\
+                BEST Chromosome of all fold\n{}\n",
+                best_chromosome
+            ).as_bytes(),
+        )
+        {
+            panic!("couldn't write to {}: {}", display, why.description());
+        }
+    }
+
+    for fold in data_sections.iter() {
+        for data in fold.iter() {
+            let (output, desired_output) =
+                best_chromosome.forward_pass(data, (input, &hidden_layer, output), false);
+            out.push(output);
+            d_out.push(desired_output);
         }
     }
 

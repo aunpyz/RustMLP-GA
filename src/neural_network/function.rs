@@ -17,3 +17,11 @@ pub fn split_section(data: Vec<Vec<f64>>, section: usize) -> Vec<Vec<Vec<f64>>> 
     }
     split_data
 }
+
+pub fn mean_sqrt_err(error_vec: Vec<f64>) -> f64 {
+    let mut sse: f64 = 0 as f64;
+    for (_i, item) in error_vec.iter().enumerate() {
+        sse += item.powi(2);
+    }
+    sse / 2.0
+}
