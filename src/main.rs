@@ -25,5 +25,6 @@ fn main() {
         input,
         String::from("wdbc_out.txt"),
     );
+    println!("Write confusion matrix file...");
     data_ops::confusion_matrix((out, desire_output), String::from("wdbc_cross_out.txt"));
 }

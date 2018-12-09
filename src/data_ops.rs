@@ -1,5 +1,7 @@
 use rand::seq::SliceRandom;
 use std::fs::File;
+use std::path::Path;
+use std::error::Error;
 use std::io::BufReader;
 use std::io::prelude::*;
 
@@ -30,10 +32,74 @@ pub fn vectorize(f: BufReader<File>) -> Vec<Vec<f64>> {
     data_all
 }
 
+// example of data in output, desire_output vector
+// [[0,1], [1,0], [0,1], ...]
+
+// output structure
+// output/ desire output   M   B    undefined
+//                     M   #   #       #
+//                     B   #   #       #
+//             undefined   #   #       #
 pub fn confusion_matrix(
     (output, desire_output): (Vec<Vec<f64>>, Vec<Vec<f64>>),
     out_filename: String,
 ) {
-    println!("{} {}", output.len(), desire_output.len());
-    panic!("output {:?}\ndesired output {:?}", output, desire_output);
+    assert_eq!(output.len(), desire_output.len());
+    assert_eq!(output[0].len(), 2);
+
+    let path = format!("./out/{}", out_filename);
+    let path = Path::new(&path);
+    let display = path.display();
+
+    let mut matrix: Vec<Vec<usize>> = vec![vec![0, 0, 0], vec![0, 0, 0], vec![0, 0, 0]];
+    let mut f = match File::create(&path) {
+        Err(why) => panic!("couldn't create {}: {}", display, why.description()),
+        Ok(f) => f,
+    };
+
+    for i in 0..output.len() {
+        let row = if output[i][0] < output[i][1] {
+            // M
+            0
+        } else if output[i][0] > output[i][1] {
+            // B
+            1
+        } else {
+            // undefined class
+            2
+        };
+        // desire output classes are checked in preprocess; vectorize function
+        let col = if desire_output[i][0] < desire_output[i][1] {
+            0
+        } else {
+            1
+        };
+
+        matrix[row][col] += 1;
+    }
+
+    {
+        if let Err(why) = f.write_all(
+            format!(
+                "\
+            output\\desire output\t|\tM\t|\tB\t|\tundefined\n\
+            M\t\t\t\t\t\t|\t{}\t|\t{}\t|\t{}\n\
+            B\t\t\t\t\t\t|\t{}\t|\t{}\t|\t{}\n\
+            undefined\t\t\t\t|\t{}\t|\t{}\t|\t{}\n\
+            =====================================================\n",
+                matrix[0][0],
+                matrix[0][1],
+                matrix[0][2],
+                matrix[1][0],
+                matrix[1][1],
+                matrix[1][2],
+                matrix[2][0],
+                matrix[2][1],
+                matrix[2][2]
+            ).as_bytes(),
+        )
+        {
+            panic!("couldn't write to {}: {}", display, why.description());
+        }
+    }
 }

@@ -1,5 +1,6 @@
 /target
 **/*.rs.bk
+**/*.sh
 Cargo.lock
 /data
 /out
